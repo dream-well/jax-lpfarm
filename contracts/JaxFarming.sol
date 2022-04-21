@@ -131,9 +131,17 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
             uint[] memory amounts = JaxLibrary.swapWithPriceImpactLimit(address(router), busd_for_wjxn, 3e6, path, address(this)); // price impact 3%
             wjxn_amount = amounts[1];
         }
-        (, , uint lp_amount) = 
+        (uint busd_added, uint wjxn_added, uint lp_amount) = 
             router.addLiquidity(path[0], path[1], busd_amount - busd_for_wjxn, wjxn_amount, 0, 0, address(this), block.timestamp);
-        _create_farm(lp_amount, busd_amount);
+        if(wjxn_amount > wjxn_added) {
+            path[0] = address(wjxn);
+            path[1] = address(busd);
+            router.swapExactTokensForTokens(wjxn_amount - wjxn_added, 0, path, msg.sender, block.timestamp);
+        }
+        if(busd_amount - busd_for_wjxn > busd_added) {
+            busd.transfer(msg.sender, busd_amount - busd_for_wjxn - busd_added);
+        }
+        _create_farm(lp_amount, busd_added);
         _add_liquidity();
     }
 
@@ -234,7 +242,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
     }
 
     function capacity_status() external view returns (uint) {
-        if(is_deposit_freezed == false) return 0;
+        if(is_deposit_freezed == true) return 0;
         uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
         return 1e8 * (total_reward - released_reward) / hst_in_busd;
     }
