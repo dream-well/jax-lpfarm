@@ -74,7 +74,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         wjxn.approve(address(router), type(uint).max);
         wjxn.approve(address(hst), type(uint).max);
 
-        minimum_wjxn_price = 0;
+        minimum_wjxn_price = 1.5 * 1e18; // 1.5 USD
 
         farm_period = 120 days;
         total_reward = 0;
@@ -228,7 +228,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
     }
 
     function set_minimum_wjxn_price(uint price) external onlyOwner runProtection {
-        require(price >= 15 * (10 ** busd.decimals()) / 10, "Minimum wjxn price should be above 1.5 USD");
+        require(price >= 1.5 * 1e18, "Minimum wjxn price should be above 1.5 USD");
         minimum_wjxn_price = price;
         emit Set_Minimum_Wjxn_Price(price);
     }
