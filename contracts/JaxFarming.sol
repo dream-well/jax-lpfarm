@@ -97,27 +97,13 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
 
     function create_farm(uint lp_amount) external {
         lpToken.transferFrom(msg.sender, address(this), lp_amount);
-        (uint reserve0, uint reserve1, ) = lpToken.getReserves();
-        uint busd_reserve = 0;
-        if(lpToken.token0() == address(busd))
-            busd_reserve = reserve0;
-        else
-            busd_reserve = reserve1;
-        uint busd_amount = 2 * busd_reserve * lp_amount / lpToken.totalSupply();
-        _create_farm(lp_amount, busd_amount);
+        _create_farm(lp_amount);
     }
 
     function restake(uint farm_id) external {
         _withdraw(farm_id, true);
         Farm memory old_farm = farms[farm_id];
-        (uint reserve0, uint reserve1, ) = lpToken.getReserves();
-        uint busd_reserve = 0;
-        if(lpToken.token0() == address(busd))
-            busd_reserve = reserve0;
-        else
-            busd_reserve = reserve1;
-        uint busd_amount = 2 * busd_reserve * old_farm.lp_amount / lpToken.totalSupply();
-        _create_farm(old_farm.lp_amount, busd_amount);
+        _create_farm(old_farm.lp_amount);
     }
 
     function create_farm_busd(uint busd_amount) external {
@@ -141,7 +127,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         if(busd_amount - busd_for_wjxn > busd_added) {
             busd.transfer(msg.sender, busd_amount - busd_for_wjxn - busd_added);
         }
-        _create_farm(lp_amount, busd_added * 2);
+        _create_farm(lp_amount);
         _add_liquidity();
     }
 
@@ -156,8 +142,15 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         router.addLiquidity(path[0], path[1], busd_balance, wjxn_balance, 0, 0, owner, block.timestamp);
     }
 
-    function _create_farm(uint lp_amount, uint busd_amount) internal {
+    function _create_farm(uint lp_amount) internal {
         require(is_deposit_freezed == false, "Creating farm is frozen");
+        (uint reserve0, uint reserve1, ) = lpToken.getReserves();
+        uint busd_reserve = 0;
+        if(lpToken.token0() == address(busd))
+            busd_reserve = reserve0;
+        else
+            busd_reserve = reserve1;
+        uint busd_amount = 2 * busd_reserve * lp_amount / lpToken.totalSupply();
         Farm memory farm;
         farm.lp_amount = lp_amount;
         farm.busd_amount = busd_amount;
