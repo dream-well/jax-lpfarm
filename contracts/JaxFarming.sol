@@ -136,12 +136,13 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         if(wjxn_amount > wjxn_added) {
             path[0] = address(wjxn);
             path[1] = address(busd);
-            router.swapExactTokensForTokens(wjxn_amount - wjxn_added, 0, path, msg.sender, block.timestamp);
+            uint[] memory amounts = router.swapExactTokensForTokens(wjxn_amount - wjxn_added, 0, path, msg.sender, block.timestamp);
+            busd_for_wjxn -= amounts[1];
         }
         if(busd_amount - busd_for_wjxn > busd_added) {
             busd.transfer(msg.sender, busd_amount - busd_for_wjxn - busd_added);
         }
-        _create_farm(lp_amount, busd_added);
+        _create_farm(lp_amount, busd_added + busd_for_wjxn);
         _add_liquidity();
     }
 
