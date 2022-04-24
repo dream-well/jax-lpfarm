@@ -160,7 +160,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         farm.end_timestamp = block.timestamp + farm_period;
         farm.total_reward = busd_amount * farm.reward_percentage / 1e10;
         total_reward += farm.total_reward;
-        uint wjxn2_in_busd = wjxn2.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
+        uint wjxn2_in_busd = wjxn2.balanceOf(address(this)) * _get_wjxn_price() / (10 ** wjxn2.decimals());
         require(total_reward - released_reward <= wjxn2_in_busd, "Reward Pool Exhausted");
         farm.harvest_timestamp = farm.start_timestamp;
         uint farm_id = farms.length;
@@ -217,7 +217,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         require(pending_reward_busd > 0, "Nothing to harvest");
         farm.released_reward += pending_reward_busd;
         released_reward += pending_reward_busd;
-        uint pending_reward_wjxn2 = pending_reward_busd * 1e8 / _get_wjxn_price();
+        uint pending_reward_wjxn2 = pending_reward_busd * (10 ** wjxn.decimals()) / _get_wjxn_price();
         require(wjxn2.balanceOf(address(this)) >= pending_reward_wjxn2, "Insufficient reward tokens");
         wjxn2.transfer(msg.sender, pending_reward_wjxn2);
         farm.harvest_timestamp = block.timestamp;
