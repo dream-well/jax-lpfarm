@@ -18,7 +18,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
 
     IERC20 public wjxn;
     IERC20 public busd;
-    IERC20 public hst;
+    IERC20 public wjxn2;
 
     uint public minimum_wjxn_price; // 1e18
     uint public farm_period;
@@ -49,7 +49,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
     mapping(address => uint[]) public user_farms;
 
     event Create_Farm(uint farm_id, uint amount);
-    event Harvest(uint farm_id, uint busd_amount, uint hst_amount);
+    event Harvest(uint farm_id, uint busd_amount, uint wjxn2_amount);
     event Set_Farm_Reward_Percentage(uint period, uint percentage);
     event Set_Minimum_Wjxn_Price(uint price);
     event Freeze_Deposit(bool flag);
@@ -61,18 +61,18 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         _;
     }
 
-    function initialize(IPancakeRouter01 _router, IERC20 _wjxn, IERC20 _busd, IERC20 _hst) external initializer 
-        checkZeroAddress(address(_router)) checkZeroAddress(address(_wjxn)) checkZeroAddress(address(_busd)) checkZeroAddress(address(_hst))
+    function initialize(IPancakeRouter01 _router, IERC20 _wjxn, IERC20 _busd, IERC20 _wjxn2) external initializer 
+        checkZeroAddress(address(_router)) checkZeroAddress(address(_wjxn)) checkZeroAddress(address(_busd)) checkZeroAddress(address(_wjxn2))
     {
         router = _router;
         lpToken = IPancakePair(IPancakeFactory(router.factory()).getPair(address(_wjxn), address(_busd)));
         wjxn = _wjxn;
         busd = _busd;
-        hst = _hst;
+        wjxn2 = _wjxn2;
 
         busd.approve(address(router), type(uint).max);
         wjxn.approve(address(router), type(uint).max);
-        wjxn.approve(address(hst), type(uint).max);
+        wjxn.approve(address(wjxn2), type(uint).max);
 
         minimum_wjxn_price = 1.5 * 1e18; // 1.5 USD
 
@@ -160,8 +160,8 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         farm.end_timestamp = block.timestamp + farm_period;
         farm.total_reward = busd_amount * farm.reward_percentage / 1e10;
         total_reward += farm.total_reward;
-        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
-        require(total_reward - released_reward <= hst_in_busd, "Reward Pool Exhausted");
+        uint wjxn2_in_busd = wjxn2.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
+        require(total_reward - released_reward <= wjxn2_in_busd, "Reward Pool Exhausted");
         farm.harvest_timestamp = farm.start_timestamp;
         uint farm_id = farms.length;
         farms.push(farm);
@@ -205,7 +205,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         else
             past_period = block.timestamp - farm.start_timestamp;
         uint period = farm.end_timestamp - farm.start_timestamp;
-        uint reward = farm.total_reward * past_period / period; // hst stornetta
+        uint reward = farm.total_reward * past_period / period; // wjxn2 stornetta
         return reward - farm.released_reward;
     }
 
@@ -217,11 +217,11 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         require(pending_reward_busd > 0, "Nothing to harvest");
         farm.released_reward += pending_reward_busd;
         released_reward += pending_reward_busd;
-        uint pending_reward_hst = pending_reward_busd * 1e8 / _get_wjxn_price();
-        require(hst.balanceOf(address(this)) >= pending_reward_hst, "Insufficient reward tokens");
-        hst.transfer(msg.sender, pending_reward_hst);
+        uint pending_reward_wjxn2 = pending_reward_busd * 1e8 / _get_wjxn_price();
+        require(wjxn2.balanceOf(address(this)) >= pending_reward_wjxn2, "Insufficient reward tokens");
+        wjxn2.transfer(msg.sender, pending_reward_wjxn2);
         farm.harvest_timestamp = block.timestamp;
-        emit Harvest(farm_id, pending_reward_busd, pending_reward_hst);
+        emit Harvest(farm_id, pending_reward_busd, pending_reward_wjxn2);
     }
 
     function get_farm_ids(address account) external view returns(uint[] memory){
@@ -236,8 +236,8 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
 
     function capacity_status() external view returns (uint) {
         if(is_deposit_freezed == true) return 0;
-        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
-        return 1e8 * (total_reward - released_reward) / hst_in_busd;
+        uint wjxn2_in_busd = wjxn2.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
+        return 1e8 * (total_reward - released_reward) / wjxn2_in_busd;
     }
 
     function withdraw(uint farm_id) external {
