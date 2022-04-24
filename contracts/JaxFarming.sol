@@ -217,7 +217,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         require(pending_reward_busd > 0, "Nothing to harvest");
         farm.released_reward += pending_reward_busd;
         released_reward += pending_reward_busd;
-        uint pending_reward_wjxn2 = pending_reward_busd * (10 ** wjxn.decimals()) / _get_wjxn_price();
+        uint pending_reward_wjxn2 = pending_reward_busd * (10 ** wjxn2.decimals()) / _get_wjxn_price();
         require(wjxn2.balanceOf(address(this)) >= pending_reward_wjxn2, "Insufficient reward tokens");
         wjxn2.transfer(msg.sender, pending_reward_wjxn2);
         farm.harvest_timestamp = block.timestamp;
@@ -236,7 +236,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
 
     function capacity_status() external view returns (uint) {
         if(is_deposit_freezed == true) return 0;
-        uint wjxn2_in_busd = wjxn2.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
+        uint wjxn2_in_busd = wjxn2.balanceOf(address(this)) * _get_wjxn_price() / (10 ** wjxn2.decimals());
         return 1e8 * (total_reward - released_reward) / wjxn2_in_busd;
     }
 
