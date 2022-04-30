@@ -164,7 +164,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         farm.end_timestamp = block.timestamp + farm_period;
         farm.total_reward = busd_amount * farm.reward_percentage / 1e10;
         total_reward += farm.total_reward;
-        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price();
+        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
         require(total_reward - released_reward <= hst_in_busd, "Reward Pool Exhausted");
         farm.harvest_timestamp = farm.start_timestamp;
         uint farm_id = farms.length;
@@ -240,7 +240,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
 
     function capacity_status() external view returns (uint) {
         if(is_deposit_freezed) return 0;
-        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price();
+        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
         return 1e8 * (total_reward - released_reward) / hst_in_busd;
     }
 
