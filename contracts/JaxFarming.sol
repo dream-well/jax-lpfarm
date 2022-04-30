@@ -22,7 +22,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
 
     IERC20Metadata public wjxn;
     IERC20Metadata public busd;
-    IERC20Metadata public wjxn2;
+    IERC20Metadata public hst;
 
     uint public minimum_wjxn_price; // 1e18
     uint public farm_period;
@@ -53,7 +53,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
     mapping(address => uint[]) public user_farms;
 
     event Create_Farm(uint farm_id, uint amount);
-    event Harvest(uint farm_id, uint busd_amount, uint wjxn2_amount);
+    event Harvest(uint farm_id, uint busd_amount, uint hst_amount);
     event Set_Minimum_Wjxn_Price(uint price);
     event Freeze_Deposit(bool flag);
     event Withdraw(uint farm_id);
@@ -64,19 +64,19 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         _;
     }
 
-    function initialize(IPancakeRouter01 _router, IERC20Metadata _wjxn, IERC20Metadata _busd, IERC20Metadata _wjxn2) external initializer 
-        checkZeroAddress(address(_router)) checkZeroAddress(address(_wjxn)) checkZeroAddress(address(_busd)) checkZeroAddress(address(_wjxn2))
+    function initialize(IPancakeRouter01 _router, IERC20Metadata _wjxn, IERC20Metadata _busd, IERC20Metadata _hst) external initializer 
+        checkZeroAddress(address(_router)) checkZeroAddress(address(_wjxn)) checkZeroAddress(address(_busd)) checkZeroAddress(address(_hst))
     {
         __ReentrancyGuard_init();
         router = _router;
         lpToken = IPancakePair(IPancakeFactory(router.factory()).getPair(address(_wjxn), address(_busd)));
         wjxn = _wjxn;
         busd = _busd;
-        wjxn2 = _wjxn2;
+        hst = _hst;
 
         busd.safeApprove(address(router), type(uint).max);
         wjxn.safeApprove(address(router), type(uint).max);
-        wjxn.safeApprove(address(wjxn2), type(uint).max);
+        wjxn.safeApprove(address(hst), type(uint).max);
 
         minimum_wjxn_price = 1.5 * 1e18; // 1.5 USD
 
@@ -164,8 +164,8 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         farm.end_timestamp = block.timestamp + farm_period;
         farm.total_reward = busd_amount * farm.reward_percentage / 1e10;
         total_reward += farm.total_reward;
-        uint wjxn2_in_busd = wjxn2.balanceOf(address(this)) * _get_wjxn_price() / (10 ** wjxn2.decimals());
-        require(total_reward - released_reward <= wjxn2_in_busd, "Reward Pool Exhausted");
+        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price();
+        require(total_reward - released_reward <= hst_in_busd, "Reward Pool Exhausted");
         farm.harvest_timestamp = farm.start_timestamp;
         uint farm_id = farms.length;
         farms.push(farm);
@@ -209,7 +209,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         else
             past_period = block.timestamp - farm.start_timestamp;
         uint period = farm.end_timestamp - farm.start_timestamp;
-        uint reward = farm.total_reward * past_period / period; // wjxn2 stornetta
+        uint reward = farm.total_reward * past_period / period; // hst stornetta
         return reward - farm.released_reward;
     }
 
@@ -221,11 +221,11 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         require(pending_reward_busd > 0, "Nothing to harvest");
         farm.released_reward += pending_reward_busd;
         released_reward += pending_reward_busd;
-        uint pending_reward_wjxn2 = pending_reward_busd * (10 ** wjxn2.decimals()) / _get_wjxn_price();
-        require(wjxn2.balanceOf(address(this)) >= pending_reward_wjxn2, "Insufficient reward tokens");
-        wjxn2.safeTransfer(msg.sender, pending_reward_wjxn2);
+        uint pending_reward_hst = pending_reward_busd * 1e8 / _get_wjxn_price();
+        require(hst.balanceOf(address(this)) >= pending_reward_hst, "Insufficient reward tokens");
+        hst.safeTransfer(msg.sender, pending_reward_hst);
         farm.harvest_timestamp = block.timestamp;
-        emit Harvest(farm_id, pending_reward_busd, pending_reward_wjxn2);
+        emit Harvest(farm_id, pending_reward_busd, pending_reward_hst);
     }
 
     function get_farm_ids(address account) external view returns(uint[] memory){
@@ -240,8 +240,8 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
 
     function capacity_status() external view returns (uint) {
         if(is_deposit_freezed) return 0;
-        uint wjxn2_in_busd = wjxn2.balanceOf(address(this)) * _get_wjxn_price() / (10 ** wjxn2.decimals());
-        return 1e8 * (total_reward - released_reward) / wjxn2_in_busd;
+        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price();
+        return 1e8 * (total_reward - released_reward) / hst_in_busd;
     }
 
     function withdraw(uint farm_id) external nonReentrant {
