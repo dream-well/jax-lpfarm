@@ -3,22 +3,26 @@
 pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "./JaxOwnable.sol";
 import "./JaxProtection.sol";
 import "./JaxLibrary.sol";
-import "./interface/IERC20.sol";
 import "./interface/IPancakeRouter.sol";
 
-contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
+contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard {
 
+    using SafeERC20 for IERC20Metadata;
+    using SafeERC20 for IPancakePair;
     using JaxLibrary for JaxFarming;
 
     IPancakeRouter01 public router;
     IPancakePair public lpToken;
 
-    IERC20 public wjxn;
-    IERC20 public busd;
-    IERC20 public wjxn2;
+    IERC20Metadata public wjxn;
+    IERC20Metadata public busd;
+    IERC20Metadata public wjxn2;
 
     uint public minimum_wjxn_price; // 1e18
     uint public farm_period;
@@ -50,7 +54,6 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
 
     event Create_Farm(uint farm_id, uint amount);
     event Harvest(uint farm_id, uint busd_amount, uint wjxn2_amount);
-    event Set_Farm_Reward_Percentage(uint period, uint percentage);
     event Set_Minimum_Wjxn_Price(uint price);
     event Freeze_Deposit(bool flag);
     event Withdraw(uint farm_id);
@@ -61,7 +64,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         _;
     }
 
-    function initialize(IPancakeRouter01 _router, IERC20 _wjxn, IERC20 _busd, IERC20 _wjxn2) external initializer 
+    function initialize(IPancakeRouter01 _router, IERC20Metadata _wjxn, IERC20Metadata _busd, IERC20Metadata _wjxn2) external initializer 
         checkZeroAddress(address(_router)) checkZeroAddress(address(_wjxn)) checkZeroAddress(address(_busd)) checkZeroAddress(address(_wjxn2))
     {
         router = _router;
@@ -70,13 +73,13 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         busd = _busd;
         wjxn2 = _wjxn2;
 
-        busd.approve(address(router), type(uint).max);
-        wjxn.approve(address(router), type(uint).max);
-        wjxn.approve(address(wjxn2), type(uint).max);
+        busd.safeApprove(address(router), type(uint).max);
+        wjxn.safeApprove(address(router), type(uint).max);
+        wjxn.safeApprove(address(wjxn2), type(uint).max);
 
         minimum_wjxn_price = 1.5 * 1e18; // 1.5 USD
 
-        farm_period = 120 days;
+        farm_period = 12 minutes;
         total_reward = 0;
         released_reward = 0;
 
@@ -95,19 +98,19 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         return reward_pecentages[elapsed_days];
     }
 
-    function create_farm(uint lp_amount) external {
-        lpToken.transferFrom(msg.sender, address(this), lp_amount);
+    function create_farm(uint lp_amount) external nonReentrant {
+        IERC20Metadata(address(lpToken)).safeTransferFrom(msg.sender, address(this), lp_amount);
         _create_farm(lp_amount);
     }
 
-    function restake(uint farm_id) external {
+    function restake(uint farm_id) external nonReentrant {
         _withdraw(farm_id, true);
         Farm memory old_farm = farms[farm_id];
         _create_farm(old_farm.lp_amount);
     }
 
-    function create_farm_busd(uint busd_amount) external {
-        busd.transferFrom(msg.sender, address(this), busd_amount);
+    function create_farm_busd(uint busd_amount) external nonReentrant {
+        busd.safeTransferFrom(msg.sender, address(this), busd_amount);
         uint busd_for_wjxn = busd_amount / 2;
         address[] memory path = new address[](2);
         path[0] = address(busd);
@@ -118,14 +121,14 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
             wjxn_amount = amounts[1];
         }
         (uint busd_added, uint wjxn_added, uint lp_amount) = 
-            router.addLiquidity(path[0], path[1], busd_amount - busd_for_wjxn, wjxn_amount, 0, 0, address(this), block.timestamp);
+            router.addLiquidity(path[0], path[1], busd_amount - busd_for_wjxn, wjxn_amount, (busd_amount - busd_for_wjxn) * 97 / 100, wjxn_amount * 97 / 100, address(this), block.timestamp);
         if(wjxn_amount > wjxn_added) {
             path[0] = address(wjxn);
             path[1] = address(busd);
             router.swapExactTokensForTokens(wjxn_amount - wjxn_added, 0, path, msg.sender, block.timestamp);
         }
         if(busd_amount - busd_for_wjxn > busd_added) {
-            busd.transfer(msg.sender, busd_amount - busd_for_wjxn - busd_added);
+            busd.safeTransfer(msg.sender, busd_amount - busd_for_wjxn - busd_added);
         }
         _create_farm(lp_amount);
         _add_liquidity();
@@ -143,7 +146,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
     }
 
     function _create_farm(uint lp_amount) internal {
-        require(is_deposit_freezed == false, "Creating farm is frozen");
+        require(!is_deposit_freezed, "Creating farm is frozen");
         (uint reserve0, uint reserve1, ) = lpToken.getReserves();
         uint busd_reserve = 0;
         if(lpToken.token0() == address(busd))
@@ -183,8 +186,8 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
     function _get_wjxn_dex_price() internal view returns(uint) {
         address pairAddress = IPancakeFactory(router.factory()).getPair(address(wjxn), address(busd));
         (uint res0, uint res1,) = IPancakePair(pairAddress).getReserves();
-        res0 *= 10 ** (18 - IERC20(IPancakePair(pairAddress).token0()).decimals());
-        res1 *= 10 ** (18 - IERC20(IPancakePair(pairAddress).token1()).decimals());
+        res0 *= 10 ** (18 - IERC20Metadata(IPancakePair(pairAddress).token0()).decimals());
+        res1 *= 10 ** (18 - IERC20Metadata(IPancakePair(pairAddress).token1()).decimals());
         if(IPancakePair(pairAddress).token0() == address(busd)) {
             if(res1 > 0)
                 return 1e18 * res0 / res1;
@@ -209,17 +212,17 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         return reward - farm.released_reward;
     }
 
-    function harvest(uint farm_id) public {
+    function harvest(uint farm_id) public nonReentrant {
         Farm storage farm = farms[farm_id];
         require(farm.owner == msg.sender, "Only farm owner");
-        require(farm.is_withdrawn == false, "Farm is withdrawn");
+        require(!farm.is_withdrawn, "Farm is withdrawn");
         uint pending_reward_busd = get_pending_reward(farm_id);
         require(pending_reward_busd > 0, "Nothing to harvest");
         farm.released_reward += pending_reward_busd;
         released_reward += pending_reward_busd;
         uint pending_reward_wjxn2 = pending_reward_busd * (10 ** wjxn2.decimals()) / _get_wjxn_price();
         require(wjxn2.balanceOf(address(this)) >= pending_reward_wjxn2, "Insufficient reward tokens");
-        wjxn2.transfer(msg.sender, pending_reward_wjxn2);
+        wjxn2.safeTransfer(msg.sender, pending_reward_wjxn2);
         farm.harvest_timestamp = block.timestamp;
         emit Harvest(farm_id, pending_reward_busd, pending_reward_wjxn2);
     }
@@ -235,12 +238,12 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
     }
 
     function capacity_status() external view returns (uint) {
-        if(is_deposit_freezed == true) return 0;
+        if(is_deposit_freezed) return 0;
         uint wjxn2_in_busd = wjxn2.balanceOf(address(this)) * _get_wjxn_price() / (10 ** wjxn2.decimals());
         return 1e8 * (total_reward - released_reward) / wjxn2_in_busd;
     }
 
-    function withdraw(uint farm_id) external {
+    function withdraw(uint farm_id) external nonReentrant {
         _withdraw(farm_id, false);
     }
 
@@ -248,10 +251,10 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
         require(farm_id < farms.length, "Invalid farm id");
         Farm storage farm = farms[farm_id];
         require(farm.owner == msg.sender, "Only farm owner can withdraw");
-        require(farm.is_withdrawn == false, "Already withdrawn");
+        require(!farm.is_withdrawn, "Already withdrawn");
         require(farm.end_timestamp <= block.timestamp, "Locked");
         if(!is_restake)
-            lpToken.transfer(farm.owner, farm.lp_amount);
+            IERC20Metadata(address(lpToken)).safeTransfer(farm.owner, farm.lp_amount);
         if(farm.total_reward > farm.released_reward)
             harvest(farm_id);
         farm.is_withdrawn = true;
@@ -259,8 +262,8 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection {
     }
 
     
-    function withdrawByAdmin(address token, uint amount) external onlyOwner runProtection {
-        IERC20(token).transfer(msg.sender, amount);
+    function withdrawByAdmin(address token, uint amount) external onlyOwner nonReentrant runProtection {
+        IERC20Metadata(token).safeTransfer(msg.sender, amount);
         emit Withdraw_By_Admin(token, amount);
     }
 
