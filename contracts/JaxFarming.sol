@@ -3,15 +3,15 @@
 pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "./JaxOwnable.sol";
 import "./JaxProtection.sol";
 import "./JaxLibrary.sol";
 import "./interface/IPancakeRouter.sol";
 
-contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard {
+contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuardUpgradeable {
 
     using SafeERC20 for IERC20Metadata;
     using SafeERC20 for IPancakePair;
@@ -67,6 +67,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
     function initialize(IPancakeRouter01 _router, IERC20Metadata _wjxn, IERC20Metadata _busd, IERC20Metadata _wjxn2) external initializer 
         checkZeroAddress(address(_router)) checkZeroAddress(address(_wjxn)) checkZeroAddress(address(_busd)) checkZeroAddress(address(_wjxn2))
     {
+        __ReentrancyGuard_init();
         router = _router;
         lpToken = IPancakePair(IPancakeFactory(router.factory()).getPair(address(_wjxn), address(_busd)));
         wjxn = _wjxn;
