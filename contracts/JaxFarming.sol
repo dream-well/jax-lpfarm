@@ -3,8 +3,8 @@
 pragma solidity 0.8.11;
 
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/IERC20MetadataUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
 import "./JaxOwnable.sol";
 import "./JaxProtection.sol";
@@ -13,16 +13,15 @@ import "./interface/IPancakeRouter.sol";
 
 contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuardUpgradeable {
 
-    using SafeERC20 for IERC20Metadata;
-    using SafeERC20 for IPancakePair;
+    using SafeERC20Upgradeable for IERC20MetadataUpgradeable;
     using JaxLibrary for JaxFarming;
 
     IPancakeRouter01 public router;
     IPancakePair public lpToken;
 
-    IERC20Metadata public wjxn;
-    IERC20Metadata public busd;
-    IERC20Metadata public hst;
+    IERC20MetadataUpgradeable public wjxn;
+    IERC20MetadataUpgradeable public busd;
+    IERC20MetadataUpgradeable public hst;
 
     uint public minimum_wjxn_price; // 1e18
     uint public farm_period;
@@ -64,7 +63,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         _;
     }
 
-    function initialize(IPancakeRouter01 _router, IERC20Metadata _wjxn, IERC20Metadata _busd, IERC20Metadata _hst) external initializer 
+    function initialize(IPancakeRouter01 _router, IERC20MetadataUpgradeable _wjxn, IERC20MetadataUpgradeable _busd, IERC20MetadataUpgradeable _hst) external initializer 
         checkZeroAddress(address(_router)) checkZeroAddress(address(_wjxn)) checkZeroAddress(address(_busd)) checkZeroAddress(address(_hst))
     {
         __ReentrancyGuard_init();
@@ -100,7 +99,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
     }
 
     function create_farm(uint lp_amount) external nonReentrant {
-        IERC20Metadata(address(lpToken)).safeTransferFrom(msg.sender, address(this), lp_amount);
+        IERC20MetadataUpgradeable(address(lpToken)).safeTransferFrom(msg.sender, address(this), lp_amount);
         _create_farm(lp_amount);
     }
 
@@ -164,7 +163,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         farm.end_timestamp = block.timestamp + farm_period;
         farm.total_reward = busd_amount * farm.reward_percentage / 1e10;
         total_reward += farm.total_reward;
-        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
+        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price();
         require(total_reward - released_reward <= hst_in_busd, "Reward Pool Exhausted");
         farm.harvest_timestamp = farm.start_timestamp;
         uint farm_id = farms.length;
@@ -187,8 +186,8 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
     function _get_wjxn_dex_price() internal view returns(uint) {
         address pairAddress = IPancakeFactory(router.factory()).getPair(address(wjxn), address(busd));
         (uint res0, uint res1,) = IPancakePair(pairAddress).getReserves();
-        res0 *= 10 ** (18 - IERC20Metadata(IPancakePair(pairAddress).token0()).decimals());
-        res1 *= 10 ** (18 - IERC20Metadata(IPancakePair(pairAddress).token1()).decimals());
+        res0 *= 10 ** (18 - IERC20MetadataUpgradeable(IPancakePair(pairAddress).token0()).decimals());
+        res1 *= 10 ** (18 - IERC20MetadataUpgradeable(IPancakePair(pairAddress).token1()).decimals());
         if(IPancakePair(pairAddress).token0() == address(busd)) {
             if(res1 > 0)
                 return 1e18 * res0 / res1;
@@ -240,7 +239,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
 
     function capacity_status() external view returns (uint) {
         if(is_deposit_freezed) return 0;
-        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
+        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price();
         return 1e8 * (total_reward - released_reward) / hst_in_busd;
     }
 
@@ -255,7 +254,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         require(!farm.is_withdrawn, "Already withdrawn");
         require(farm.end_timestamp <= block.timestamp, "Locked");
         if(!is_restake)
-            IERC20Metadata(address(lpToken)).safeTransfer(farm.owner, farm.lp_amount);
+            IERC20MetadataUpgradeable(address(lpToken)).safeTransfer(farm.owner, farm.lp_amount);
         if(farm.total_reward > farm.released_reward)
             harvest(farm_id);
         farm.is_withdrawn = true;
@@ -264,7 +263,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
 
     
     function withdrawByAdmin(address token, uint amount) external onlyOwner nonReentrant runProtection {
-        IERC20Metadata(token).safeTransfer(msg.sender, amount);
+        IERC20MetadataUpgradeable(token).safeTransfer(msg.sender, amount);
         emit Withdraw_By_Admin(token, amount);
     }
 
