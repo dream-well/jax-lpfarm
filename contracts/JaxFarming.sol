@@ -142,6 +142,8 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         address[] memory path = new address[](2);
         path[0] = address(busd);
         path[1] = address(wjxn);
+        (, , uint blockTimestampLast) = lpToken.getReserves();
+        require(blockTimestampLast < block.timestamp, "Warning: potential sandwich attack, try again");
         router.addLiquidity(path[0], path[1], busd_balance, wjxn_balance, 0, 0, owner, block.timestamp);
     }
 
