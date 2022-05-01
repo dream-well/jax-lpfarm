@@ -79,7 +79,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
 
         minimum_wjxn_price = 1.5 * 1e18; // 1.5 USD
 
-        farm_period = 120 days;
+        farm_period = 12 minutes;
         total_reward = 0;
         released_reward = 0;
 
@@ -131,20 +131,22 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
             busd.safeTransfer(msg.sender, busd_amount - busd_for_wjxn - busd_added);
         }
         _create_farm(lp_amount);
-        _add_liquidity();
     }
 
-    function _add_liquidity() internal {
-        uint busd_balance = busd.balanceOf(address(this));
+    function add_liquidity(uint busd_amount, uint minimum_wjxn_amount) external onlyOwner {
+        _add_liquidity(busd_amount, minimum_wjxn_amount);
+    }
+
+    function _add_liquidity(uint busd_amount, uint minimum_wjxn_amount) internal {
         uint wjxn_balance = wjxn.balanceOf(address(this));
-        if(busd_balance < 10000 * 1e18 || wjxn_balance == 0)
+        if(busd_amount < 10000 * 1e18 || wjxn_balance == 0)
             return;
         address[] memory path = new address[](2);
         path[0] = address(busd);
         path[1] = address(wjxn);
         (, , uint blockTimestampLast) = lpToken.getReserves();
         require(blockTimestampLast < block.timestamp, "Warning: potential sandwich attack, try again");
-        router.addLiquidity(path[0], path[1], busd_balance, wjxn_balance, 0, 0, owner, block.timestamp);
+        router.addLiquidity(path[0], path[1], busd_amount, wjxn_balance, busd_amount, minimum_wjxn_amount, owner, block.timestamp);
     }
 
     function _create_farm(uint lp_amount) internal {
@@ -165,7 +167,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         farm.end_timestamp = block.timestamp + farm_period;
         farm.total_reward = busd_amount * farm.reward_percentage / 1e10;
         total_reward += farm.total_reward;
-        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price();
+        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
         require(total_reward - released_reward <= hst_in_busd, "Reward Pool Exhausted");
         farm.harvest_timestamp = farm.start_timestamp;
         uint farm_id = farms.length;
@@ -241,7 +243,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
 
     function capacity_status() external view returns (uint) {
         if(is_deposit_freezed) return 0;
-        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price();
+        uint hst_in_busd = hst.balanceOf(address(this)) * _get_wjxn_price() / 1e8;
         return 1e8 * (total_reward - released_reward) / hst_in_busd;
     }
 
