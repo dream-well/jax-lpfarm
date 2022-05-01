@@ -79,7 +79,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
 
         minimum_wjxn_price = 1.5 * 1e18; // 1.5 USD
 
-        farm_period = 12 minutes;
+        farm_period = 120 days;
         total_reward = 0;
         released_reward = 0;
 
