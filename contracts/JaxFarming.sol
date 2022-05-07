@@ -216,7 +216,11 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         return reward - farm.released_reward;
     }
 
-    function harvest(uint farm_id) public nonReentrant {
+    function harvest(uint farm_id) external nonReentrant {
+        _harvest(farm_id);
+    }
+
+    function _harvest(uint farm_id) internal {
         Farm storage farm = farms[farm_id];
         require(farm.owner == msg.sender, "Only farm owner");
         require(!farm.is_withdrawn, "Farm is withdrawn");
@@ -260,7 +264,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         if(!is_restake)
             IERC20MetadataUpgradeable(address(lpToken)).safeTransfer(farm.owner, farm.lp_amount);
         if(farm.total_reward > farm.released_reward)
-            harvest(farm_id);
+            _harvest(farm_id);
         farm.is_withdrawn = true;
         emit Withdraw(farm_id);
     }
