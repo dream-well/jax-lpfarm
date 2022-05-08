@@ -121,7 +121,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
             wjxn_amount = amounts[1];
         }
         (uint busd_added, uint wjxn_added, uint lp_amount) = 
-            router.addLiquidity(path[0], path[1], busd_amount - busd_for_wjxn, wjxn_amount, (busd_amount - busd_for_wjxn) * 97 / 100, wjxn_amount * 97 / 100, address(this), block.timestamp);
+            router.addLiquidity(path[0], path[1], busd_amount - busd_for_wjxn, wjxn_amount, 0, wjxn_amount * 97 / 100, address(this), block.timestamp);
         if(wjxn_amount > wjxn_added) {
             path[0] = address(wjxn);
             path[1] = address(busd);
@@ -146,7 +146,7 @@ contract JaxFarming is Initializable, JaxOwnable, JaxProtection, ReentrancyGuard
         path[1] = address(wjxn);
         (, , uint blockTimestampLast) = lpToken.getReserves();
         require(blockTimestampLast < block.timestamp, "Warning: potential sandwich attack, try again");
-        router.addLiquidity(path[0], path[1], busd_amount, wjxn_balance, busd_amount, minimum_wjxn_amount, owner, block.timestamp);
+        router.addLiquidity(path[0], path[1], busd_amount, wjxn_balance, 0, minimum_wjxn_amount, owner, block.timestamp);
     }
 
     function _create_farm(uint lp_amount) internal {
